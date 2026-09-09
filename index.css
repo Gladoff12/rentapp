@@ -1,0 +1,55 @@
+import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { useAuth } from '../AuthContext';
+
+export default function Header() {
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  const handleLogout = () => {
+    logout();
+    navigate('/');
+  };
+
+  const initials = user ? user.name.split(' ').map((p) => p[0]).slice(0, 2).join('').toUpperCase() : '';
+
+  return (
+    <header className="header">
+      <div className="header-inner">
+        <Link to="/" className="logo">
+          <div className="logo-mark">📷</div>
+          RentGear
+        </Link>
+        <nav className="nav-links">
+          <Link to="/" className={location.pathname === '/' ? 'active' : ''}>Каталог</Link>
+          {user && (
+            <Link to="/bookings" className={location.pathname === '/bookings' ? 'active' : ''}>
+              Мои бронирования
+            </Link>
+          )}
+          {user && user.role === 'admin' && (
+            <Link to="/admin" className={location.pathname === '/admin' ? 'active' : ''}>
+              Админ-панель
+            </Link>
+          )}
+        </nav>
+        <div className="header-actions">
+          {user ? (
+            <>
+              <div className="user-chip">
+                <div className="avatar">{initials}</div>
+                {user.name}
+              </div>
+              <button className="btn btn-ghost btn-sm" onClick={handleLogout}>Выйти</button>
+            </>
+          ) : (
+            <>
+              <Link to="/login" className="btn btn-ghost btn-sm">Войти</Link>
+              <Link to="/register" className="btn btn-primary btn-sm">Регистрация</Link>
+            </>
+          )}
+        </div>
+      </div>
+    </header>
+  );
+}

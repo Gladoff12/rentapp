@@ -1,0 +1,104 @@
+import { useState } from 'react';
+import api from '../api';
+
+export default function EquipmentFormModal({ item, categories, onClose, onSaved }) {
+  const [form, setForm] = useState({
+    name: item?.name || '',
+    description: item?.description || '',
+    category_id: item?.category_id || (categories[0]?.id ?? ''),
+    price_per_day: item?.price_per_day || '',
+    deposit: item?.deposit || '',
+    quantity: item?.quantity || 1,
+    image_url: item?.image_url || '',
+    is_active: item?.is_active !== undefined ? item.is_active : 1
+  });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  const update = (field) => (e) => setForm({ ...form, [field]: e.target.value });
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+    setError('');
+    try {
+      const payload = {
+        ...form,
+        price_per_day: Number(form.price_per_day),
+        deposit: Number(form.deposit),
+        quantity: Number(form.quantity),
+        category_id: Number(form.category_id)
+      };
+      if (item) {
+        await api.put(`/equipment/${item.id}`, payload);
+      } else {
+        await api.post('/equipment', payload);
+      }
+      onSaved();
+    } catch (e) {
+      setError(e.response?.data?.error || 'Не удалось сохранить');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="modal">
+        <h2>{item ? 'Редактировать оборудование' : 'Добавить оборудование'}</h2>
+        {error && <div className="error-msg">{error}</div>}
+        <form onSubmit={handleSubmit} className="form-grid">
+          <div className="field">
+            <label>Название</label>
+            <input required value={form.name} onChange={update('name')} />
+          </div>
+          <div className="field">
+            <label>Описание</label>
+            <input value={form.description} onChange={update('description')} />
+          </div>
+          <div className="field">
+            <label>Категория</label>
+            <select value={form.category_id} onChange={update('category_id')}>
+              {categories.map((c) => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
+          </div>
+          <div className="date-row">
+            <div className="field">
+              <label>Цена за день, ₽</label>
+              <input type="number" required min="0" value={form.price_per_day} onChange={update('price_per_day')} />
+            </div>
+            <div className="field">
+              <label>Залог, ₽</label>
+              <input type="number" min="0" value={form.deposit} onChange={update('deposit')} />
+            </div>
+          </div>
+          <div className="date-row">
+            <div className="field">
+              <label>Количество</label>
+              <input type="number" required min="0" value={form.quantity} onChange={update('quantity')} />
+            </div>
+            <div className="field">
+              <label>Активно</label>
+              <select value={form.is_active} onChange={update('is_active')}>
+                <option value={1}>Да</option>
+                <option value={0}>Нет</option>
+              </select>
+            </div>
+          </div>
+          <div className="field">
+            <label>URL изображения</label>
+            <input value={form.image_url} onChange={update('image_url')} placeholder="https://..." />
+          </div>
+          <div className="modal-actions">
+            <button type="button" className="btn btn-ghost btn-block" onClick={onClose}>Отмена</button>
+            <button type="submit" className="btn btn-primary btn-block" disabled={saving}>
+              {saving ? 'Сохранение...' : 'Сохранить'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}

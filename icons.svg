@@ -1,0 +1,79 @@
+import { useEffect, useState } from 'react';
+import api from '../api';
+import EquipmentCard from '../components/EquipmentCard';
+
+export default function Catalog() {
+  const [categories, setCategories] = useState([]);
+  const [items, setItems] = useState([]);
+  const [activeCategory, setActiveCategory] = useState(null);
+  const [search, setSearch] = useState('');
+  const [searchInput, setSearchInput] = useState('');
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    api.get('/categories').then((res) => setCategories(res.data));
+  }, []);
+
+  useEffect(() => {
+    setLoading(true);
+    const params = {};
+    if (activeCategory) params.category_id = activeCategory;
+    if (search) params.search = search;
+    api.get('/equipment', { params })
+      .then((res) => setItems(res.data))
+      .finally(() => setLoading(false));
+  }, [activeCategory, search]);
+
+  const handleSearch = (e) => {
+    e.preventDefault();
+    setSearch(searchInput);
+  };
+
+  return (
+    <div className="container">
+      <div className="hero">
+        <h1>Аренда фото и <span>видеооборудования</span></h1>
+        <p>Профессиональные камеры, объективы, свет и стабилизаторы для ваших съёмок. Быстрое бронирование онлайн.</p>
+        <form className="search-bar" onSubmit={handleSearch}>
+          <input
+            type="text"
+            placeholder="Найти камеру, объектив, свет..."
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+          />
+          <button className="btn btn-primary" type="submit">Искать</button>
+        </form>
+      </div>
+
+      <div className="category-row">
+        <button className={`pill ${!activeCategory ? 'active' : ''}`} onClick={() => setActiveCategory(null)}>
+          Все категории
+        </button>
+        {categories.map((c) => (
+          <button
+            key={c.id}
+            className={`pill ${activeCategory === c.id ? 'active' : ''}`}
+            onClick={() => setActiveCategory(c.id)}
+          >
+            {c.name}
+          </button>
+        ))}
+      </div>
+
+      {loading ? (
+        <div className="loader">Загрузка оборудования...</div>
+      ) : items.length === 0 ? (
+        <div className="empty-state">
+          <h3>Ничего не найдено</h3>
+          <p>Попробуйте изменить фильтр или поисковый запрос</p>
+        </div>
+      ) : (
+        <div className="grid">
+          {items.map((item) => (
+            <EquipmentCard key={item.id} item={item} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}

@@ -1,0 +1,161 @@
+import { useEffect, useState } from 'react';
+import api from '../api';
+import EquipmentFormModal from '../components/EquipmentFormModal';
+
+const STATUS_LABELS = {
+  pending: 'Ожидает',
+  confirmed: 'Подтверждено',
+  active: 'Активна',
+  completed: 'Завершена',
+  cancelled: 'Отменена'
+};
+
+function formatDate(d) {
+  return new Date(d).toLocaleDateString('ru-RU', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
+export default function Admin() {
+  const [tab, setTab] = useState('stats');
+  const [stats, setStats] = useState(null);
+  const [equipment, setEquipment] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [bookings, setBookings] = useState([]);
+  const [modalItem, setModalItem] = useState(undefined); // undefined = closed, null = new, obj = edit
+
+  const loadStats = () => api.get('/stats').then((res) => setStats(res.data));
+  const loadEquipment = () => api.get('/equipment').then((res) => setEquipment(res.data));
+  const loadCategories = () => api.get('/categories').then((res) => setCategories(res.data));
+  const loadBookings = () => api.get('/bookings').then((res) => setBookings(res.data));
+
+  useEffect(() => {
+    loadStats();
+    loadCategories();
+  }, []);
+
+  useEffect(() => {
+    if (tab === 'equipment') loadEquipment();
+    if (tab === 'bookings') loadBookings();
+    if (tab === 'stats') loadStats();
+  }, [tab]);
+
+  const handleDeleteEquipment = async (id) => {
+    if (!confirm('Скрыть это оборудование из каталога?')) return;
+    await api.delete(`/equipment/${id}`);
+    loadEquipment();
+  };
+
+  const handleStatusChange = async (id, status) => {
+    await api.put(`/bookings/${id}/status`, { status });
+    loadBookings();
+  };
+
+  return (
+    <div className="container">
+      <h1 className="page-title">Админ-панель</h1>
+
+      <div className="admin-tabs">
+        <button className={`admin-tab ${tab === 'stats' ? 'active' : ''}`} onClick={() => setTab('stats')}>Статистика</button>
+        <button className={`admin-tab ${tab === 'equipment' ? 'active' : ''}`} onClick={() => setTab('equipment')}>Оборудование</button>
+        <button className={`admin-tab ${tab === 'bookings' ? 'active' : ''}`} onClick={() => setTab('bookings')}>Бронирования</button>
+      </div>
+
+      {tab === 'stats' && stats && (
+        <div className="stats-grid">
+          <div className="stat-card">
+            <div className="label">Позиций в каталоге</div>
+            <div className="value">{stats.totalEquipment}</div>
+          </div>
+          <div className="stat-card">
+            <div className="label">Пользователей</div>
+            <div className="value">{stats.totalUsers}</div>
+          </div>
+          <div className="stat-card">
+            <div className="label">Всего бронирований</div>
+            <div className="value">{stats.totalBookings}</div>
+          </div>
+          <div className="stat-card">
+            <div className="label">Выручка</div>
+            <div className="value">{stats.revenue.toLocaleString('ru-RU')} ₽</div>
+          </div>
+        </div>
+      )}
+
+      {tab === 'equipment' && (
+        <>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
+            <button className="btn btn-primary" onClick={() => setModalItem(null)}>+ Добавить оборудование</button>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>Название</th>
+                <th>Категория</th>
+                <th>Цена/день</th>
+                <th>Кол-во</th>
+                <th>Статус</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {equipment.map((e) => (
+                <tr key={e.id}>
+                  <td>{e.name}</td>
+                  <td>{e.category_name}</td>
+                  <td>{e.price_per_day.toLocaleString('ru-RU')} ₽</td>
+                  <td>{e.quantity}</td>
+                  <td>{e.is_active ? 'Активно' : 'Скрыто'}</td>
+                  <td style={{ display: 'flex', gap: 8 }}>
+                    <button className="btn btn-ghost btn-sm" onClick={() => setModalItem(e)}>Изменить</button>
+                    <button className="btn btn-danger btn-sm" onClick={() => handleDeleteEquipment(e.id)}>Скрыть</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </>
+      )}
+
+      {tab === 'bookings' && (
+        <table>
+          <thead>
+            <tr>
+              <th>Клиент</th>
+              <th>Оборудование</th>
+              <th>Даты</th>
+              <th>Сумма</th>
+              <th>Статус</th>
+              <th>Изменить</th>
+            </tr>
+          </thead>
+          <tbody>
+            {bookings.map((b) => (
+              <tr key={b.id}>
+                <td>{b.user_name}<br /><span style={{ color: 'var(--text-dim)', fontSize: 12 }}>{b.user_email}</span></td>
+                <td>{b.equipment_name}</td>
+                <td>{formatDate(b.start_date)} — {formatDate(b.end_date)}</td>
+                <td>{b.total_price.toLocaleString('ru-RU')} ₽</td>
+                <td><span className={`status-badge status-${b.status}`}>{STATUS_LABELS[b.status]}</span></td>
+                <td>
+                  <select value={b.status} onChange={(e) => handleStatusChange(b.id, e.target.value)}>
+                    {Object.entries(STATUS_LABELS).map(([k, v]) => (
+                      <option key={k} value={k}>{v}</option>
+                    ))}
+                  </select>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+
+      {modalItem !== undefined && (
+        <EquipmentFormModal
+          item={modalItem}
+          categories={categories}
+          onClose={() => setModalItem(undefined)}
+          onSaved={() => { setModalItem(undefined); loadEquipment(); }}
+        />
+      )}
+    </div>
+  );
+}
